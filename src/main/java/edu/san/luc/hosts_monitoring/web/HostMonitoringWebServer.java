@@ -3,15 +3,23 @@ package edu.san.luc.hosts_monitoring.web;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import edu.san.luc.hosts_monitoring.test.UrlTestResult;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.util.Map;
 
 /**
  * Created by sanya on 15.09.15.
  */
 public class HostMonitoringWebServer {
+    private Map<URL, UrlTestResult> testResults;
+
+    public void setTestResults(Map<URL, UrlTestResult> testResults) {
+        this.testResults = testResults;
+    }
 
     public static void main(String[] args) throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress(8000), 0);

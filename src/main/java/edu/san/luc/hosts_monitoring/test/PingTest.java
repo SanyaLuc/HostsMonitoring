@@ -16,6 +16,7 @@ public class PingTest implements Runnable {
     private Integer pingAttemptsLimit;
     private Integer httpStatusTimeout;
     private Integer pingTimeout;
+    private Map<URL, UrlTestResult> testResults;
 
     public PingTest(URL url) {
         this.url = url;
@@ -28,6 +29,10 @@ public class PingTest implements Runnable {
     @Override
     public void run() {
         this.responseTestExecutorService.submit(new HttpStatusTest());
+    }
+
+    public void setTestResults(Map<URL, UrlTestResult> testResults) {
+        this.testResults = testResults;
     }
 
     public void setHttpStatusTestExecutorService(ExecutorService responseTestExecutorService) {

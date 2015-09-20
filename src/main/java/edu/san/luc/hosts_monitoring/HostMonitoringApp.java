@@ -2,11 +2,13 @@ package edu.san.luc.hosts_monitoring;
 
 import edu.san.luc.hosts_monitoring.test.PingTest;
 import edu.san.luc.hosts_monitoring.test.UrlTestResult;
+import edu.san.luc.hosts_monitoring.web.HostMonitoringWebServer;
 
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -18,7 +20,6 @@ import static java.util.concurrent.Executors.newScheduledThreadPool;
  * Created by sanya on 14.09.15.
  */
 public class HostMonitoringApp {
-
     public static final String DEFAULT_EXECUTOR_POOL_SIZE = "1";
     public static final String DEFAULT_ATTEMPTS_LIMIT = "1";
     public static final String DEFAULT_TIMEOUT = "1000";
@@ -29,18 +30,25 @@ public class HostMonitoringApp {
     private ExecutorService httpStatusTestExecutor;
     private List<PingTest> pingTests;
 
+    private Map<URL, UrlTestResult> sharedTestResults;
+
     public HostMonitoringApp(){
         init();
     }
 
-    public static void main(String[] args) {
-        new HostMonitoringApp().runTests();
+    public static void main(String[] args) throws Exception {
+        HostMonitoringApp app = new HostMonitoringApp();
 
-
+        HostMonitoringWebServer webServer = new HostMonitoringWebServer();
+        webServer.setTestResults(app.sharedTestResults);
+        
+        app.runTests();
+        webServer.main(new String[0]);
     }
 
     public void init() {
         try {
+
             appProperties = new Properties();
             appProperties.load(loadStreamFromClasspath("app.properties"));
 
@@ -50,7 +58,10 @@ public class HostMonitoringApp {
             pingTestExecutor = newScheduledThreadPool(pingTestPoolSize);
             httpStatusTestExecutor = newFixedThreadPool(responseTestPoolSize);
 
-            pingTests = createTests(loadUrls());
+            List<URL> urls = loadUrls();
+            sharedTestResults = new ConcurrentHashMap<URL, UrlTestResult>(urls.size());
+            pingTests = createTests(urls);
+
         } catch (Exception e) {
             throw new AppInitializingException("Couldn't initialize the app", e);
         }
@@ -72,10 +83,9 @@ public class HostMonitoringApp {
         List<PingTest> tests = new ArrayList<PingTest>();
 
         Map<Integer, Integer> intervalPerPingStatus = mapIntervalPerPingStatus();
-        int pingAttemptsLimit = valueOf(appProperties.getProperty("ping.attepmts.limit", DEFAULT_PING_INTERVAL));
-        int pingTimeout = valueOf(appProperties.getProperty("ping.timeout", DEFAULT_PING_INTERVAL));
-        int httpStatusTimeout = valueOf(appProperties.getProperty("http.status.timeout", DEFAULT_PING_INTERVAL));
-
+        int pingAttemptsLimit = valueOf(appProperties.getProperty("ping.attepmts.limit", DEFAULT_ATTEMPTS_LIMIT));
+        int pingTimeout = valueOf(appProperties.getProperty("ping.timeout", DEFAULT_TIMEOUT));
+        int httpStatusTimeout = valueOf(appProperties.getProperty("http.status.timeout", DEFAULT_TIMEOUT));
 
         for (URL url : urls) {
             PingTest pingTest = new PingTest(url);
@@ -85,6 +95,7 @@ public class HostMonitoringApp {
             pingTest.setPingAttemptsLimit(pingAttemptsLimit);
             pingTest.setPingTimeout(pingTimeout);
             pingTest.setHttpStatusTimeout(httpStatusTimeout);
+            pingTest.setTestResults(sharedTestResults);
         }
 
         return tests;
