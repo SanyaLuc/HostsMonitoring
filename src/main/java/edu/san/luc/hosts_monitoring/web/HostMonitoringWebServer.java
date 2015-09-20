@@ -1,4 +1,4 @@
-package edu.san.luc.hosts_monitoring;
+package edu.san.luc.hosts_monitoring.web;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -11,7 +11,7 @@ import java.net.InetSocketAddress;
 /**
  * Created by sanya on 15.09.15.
  */
-public class SimpleWebServer {
+public class HostMonitoringWebServer {
 
     public static void main(String[] args) throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress(8000), 0);
