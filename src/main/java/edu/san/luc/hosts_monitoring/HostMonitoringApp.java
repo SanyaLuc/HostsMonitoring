@@ -12,6 +12,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
+import static edu.san.luc.hosts_monitoring.test.UrlTestResult.PING_FAILED;
+import static edu.san.luc.hosts_monitoring.test.UrlTestResult.PING_OK;
 import static java.lang.Integer.valueOf;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -43,7 +45,7 @@ public class HostMonitoringApp {
         webServer.setTestResults(app.sharedTestResults);
         
         app.runTests();
-        webServer.main(new String[0]);
+        webServer.start();
     }
 
     public void init() {
@@ -82,7 +84,7 @@ public class HostMonitoringApp {
     private List<PingTest> createTests(List<URL> urls){
         List<PingTest> tests = new ArrayList<PingTest>();
 
-        Map<Integer, Integer> intervalPerPingStatus = mapIntervalPerPingStatus();
+        Map<Boolean, Integer> intervalPerPingStatus = mapIntervalPerPingStatus();
         int pingAttemptsLimit = valueOf(appProperties.getProperty("ping.attepmts.limit", DEFAULT_ATTEMPTS_LIMIT));
         int pingTimeout = valueOf(appProperties.getProperty("ping.timeout", DEFAULT_TIMEOUT));
         int httpStatusTimeout = valueOf(appProperties.getProperty("http.status.timeout", DEFAULT_TIMEOUT));
@@ -107,13 +109,13 @@ public class HostMonitoringApp {
         }
     }
 
-    private Map<Integer, Integer> mapIntervalPerPingStatus(){
+    private Map<Boolean, Integer> mapIntervalPerPingStatus(){
         final int pingFailureInterval = valueOf(appProperties.getProperty("ping.failure.retry.interval", DEFAULT_PING_INTERVAL));
         final int pingSuccessInterval = valueOf(appProperties.getProperty("ping.success.retry.interval", DEFAULT_PING_INTERVAL));
 
-        return new HashMap<Integer, Integer>(){{
-            put(UrlTestResult.PING_FAILED, pingFailureInterval);
-            put(UrlTestResult.PING_OK, pingSuccessInterval);
+        return new HashMap<Boolean, Integer>(){{
+            put(PING_FAILED, pingFailureInterval);
+            put(PING_OK, pingSuccessInterval);
         }};
     }
 

@@ -22,6 +22,10 @@ public class HostMonitoringWebServer {
     }
 
     public static void main(String[] args) throws Exception {
+        new HostMonitoringWebServer().start();
+    }
+
+    public void start() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(8000), 0);
         server.createContext("/test", new MyHandler());
         server.setExecutor(null); // creates a default executor
@@ -29,15 +33,17 @@ public class HostMonitoringWebServer {
         System.out.println("Web Server is started!");
     }
 
-    static class MyHandler implements HttpHandler {
+    class MyHandler implements HttpHandler {
+
+        public static final String STATUS_ROW_TEMPLATE = "<tr><td> %s </td><td> %s </td><td> %s </td></tr>";
+
         @Override
         public void handle(HttpExchange t) throws IOException {
             String response = "<html>" +
                     "<header><title>URL Status Report</title></header>" +
                     "<body>" +
                     "<table>" +
-                        "<tr><td>1</td><td>yandex.com</td></tr>"+
-                        "<tr><td>2</td><td>google.com</td></tr>"+
+                        renderTestStatusTable() +
                     "</table>" +
                     "</body>" +
                     "</html>";
@@ -45,6 +51,33 @@ public class HostMonitoringWebServer {
             OutputStream os = t.getResponseBody();
             os.write(response.getBytes());
             os.close();
+        }
+
+        private String renderTestStatusTable(){
+            StringBuilder tableBody = new StringBuilder();
+
+            for (UrlTestResult urlTestResult : testResults.values()) {
+                String url = urlTestResult.getUrl().toString();
+                String pingStatus = renderPingStatus(urlTestResult.getPingStatus());
+                String httpStatus = renderPingStatus(urlTestResult.getPingStatus());
+
+                tableBody.append(String.format(STATUS_ROW_TEMPLATE, url, pingStatus, httpStatus));
+            }
+            return tableBody.toString();
+        }
+
+        private String renderPingStatus(Boolean pingStatus){
+            if(pingStatus == null)
+                return "ONGOING";
+
+            return pingStatus ? "OK" : "FAILED";
+        }
+
+        private String renderHttpStatus(Integer httpStatus){
+            if(httpStatus == null)
+                return "ONGOING";
+
+            return httpStatus.toString();
         }
     }
 
