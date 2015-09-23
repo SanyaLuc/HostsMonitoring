@@ -26,6 +26,8 @@ public class PingTest implements Runnable {
 
     private HttpStatusTest httpStatusTest;
 
+    private Random random = new Random();
+
     public PingTest(URL url) {
         this.url = url;
         this.httpStatusTest = new HttpStatusTest(url);
@@ -60,7 +62,12 @@ public class PingTest implements Runnable {
     }
 
     private int ping(){
-        return new Random().nextInt(1);
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return random.nextInt(2);
     }
 
     public void setTestResults(Map<URL, UrlTestResult> testResults) {

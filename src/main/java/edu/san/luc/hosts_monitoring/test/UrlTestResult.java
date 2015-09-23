@@ -30,7 +30,7 @@ public final class UrlTestResult {
         return pingStatus;
     }
 
-    public int getHttpStatus() {
+    public Integer getHttpStatus() {
         return httpStatus;
     }
 }

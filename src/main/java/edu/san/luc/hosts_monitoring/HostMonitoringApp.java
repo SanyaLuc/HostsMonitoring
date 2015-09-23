@@ -61,7 +61,9 @@ public class HostMonitoringApp {
             httpStatusTestExecutor = newFixedThreadPool(responseTestPoolSize);
 
             List<URL> urls = loadUrls();
-            sharedTestResults = new ConcurrentHashMap<URL, UrlTestResult>(urls.size());
+
+            sharedTestResults = createInitialTestResults(urls);
+
             pingTests = createTests(urls);
 
         } catch (Exception e) {
@@ -98,6 +100,8 @@ public class HostMonitoringApp {
             pingTest.setPingTimeout(pingTimeout);
             pingTest.setHttpStatusTimeout(httpStatusTimeout);
             pingTest.setTestResults(sharedTestResults);
+
+            tests.add(pingTest);
         }
 
         return tests;
@@ -121,5 +125,15 @@ public class HostMonitoringApp {
 
     private InputStream loadStreamFromClasspath(String filename){
         return getClass().getClassLoader().getResourceAsStream(filename);
+    }
+
+    private Map<URL, UrlTestResult> createInitialTestResults(List<URL> urls){
+        Map<URL, UrlTestResult> sharedTestResults = new ConcurrentHashMap<URL, UrlTestResult>(urls.size());
+
+        for (URL url : urls) {
+            sharedTestResults.put(url, new UrlTestResult(url, null, null));
+        }
+
+        return sharedTestResults;
     }
 }
