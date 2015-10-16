@@ -111,6 +111,7 @@ public class HostMonitoringApp {
         for (PingTest pingTest : pingTests) {
             pingTest.sumbmit();
         }
+
     }
 
     private Map<Boolean, Integer> mapIntervalPerPingStatus(){
