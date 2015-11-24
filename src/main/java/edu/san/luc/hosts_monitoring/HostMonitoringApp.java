@@ -1,7 +1,6 @@
 package edu.san.luc.hosts_monitoring;
 
-import edu.san.luc.hosts_monitoring.test.PingTest;
-import edu.san.luc.hosts_monitoring.test.UrlTestResult;
+import edu.san.luc.hosts_monitoring.test.*;
 import edu.san.luc.hosts_monitoring.web.HostMonitoringWebServer;
 
 import java.io.InputStream;
@@ -12,8 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
-import static edu.san.luc.hosts_monitoring.test.UrlTestResult.PING_FAILED;
-import static edu.san.luc.hosts_monitoring.test.UrlTestResult.PING_OK;
+import static edu.san.luc.hosts_monitoring.test.HostTestResult.PING_FAILED;
+import static edu.san.luc.hosts_monitoring.test.HostTestResult.PING_OK;
 import static java.lang.Integer.valueOf;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -27,12 +26,16 @@ public class HostMonitoringApp {
     public static final String DEFAULT_TIMEOUT = "1000";
     public static final String DEFAULT_PING_INTERVAL = "60";
 
-    private Properties appProperties;
     private ScheduledExecutorService pingTestExecutor;
     private ExecutorService httpStatusTestExecutor;
-    private List<PingTest> pingTests;
+    private List<HostTestRunner> pingTests;
 
-    private Map<URL, UrlTestResult> sharedTestResults;
+    private List<URL> urls;
+    private Map<String, HostTestResult> sharedTestResults;
+
+    private Properties appProperties;
+    private Integer pingTestPoolSize;
+    private Integer responseTestPoolSize;
 
     public HostMonitoringApp(){
         init();
@@ -42,9 +45,10 @@ public class HostMonitoringApp {
         HostMonitoringApp app = new HostMonitoringApp();
 
         HostMonitoringWebServer webServer = new HostMonitoringWebServer();
+        webServer.setUrls(app.urls);
         webServer.setTestResults(app.sharedTestResults);
         
-        app.runTests();
+//        app.runTests();
         webServer.start();
     }
 
@@ -54,16 +58,17 @@ public class HostMonitoringApp {
             appProperties = new Properties();
             appProperties.load(loadStreamFromClasspath("app.properties"));
 
-            int pingTestPoolSize = valueOf(appProperties.getProperty("ping.test.executor.pool.size", DEFAULT_EXECUTOR_POOL_SIZE));
-            int responseTestPoolSize = valueOf(appProperties.getProperty("http.status.test.executor.pool.size", DEFAULT_EXECUTOR_POOL_SIZE));
+            pingTestPoolSize = valueOf(appProperties.getProperty("ping.test.executor.pool.size", DEFAULT_EXECUTOR_POOL_SIZE));
+            responseTestPoolSize = valueOf(appProperties.getProperty("http.status.test.executor.pool.size", DEFAULT_EXECUTOR_POOL_SIZE));
 
             pingTestExecutor = newScheduledThreadPool(pingTestPoolSize);
             httpStatusTestExecutor = newFixedThreadPool(responseTestPoolSize);
 
-            List<URL> urls = loadUrls();
+            urls = loadUrls();
 
             sharedTestResults = createInitialTestResults(urls);
 
+            pingTests = createSimpleThreadTests(urls);
             pingTests = createTests(urls);
 
         } catch (Exception e) {
@@ -76,30 +81,28 @@ public class HostMonitoringApp {
         Scanner scanner = new Scanner(loadStreamFromClasspath("hosts.list"));
 
         while(scanner.hasNextLine()){
-            String urlLine = scanner.nextLine();
+            String urlLine = scanner.nextLine().trim();
             urls.add(new URL(urlLine));
         }
 
         return urls;
     }
 
-    private List<PingTest> createTests(List<URL> urls){
-        List<PingTest> tests = new ArrayList<PingTest>();
+    private List<HostTestRunner> createTests(List<URL> urls){
+        List<HostTestRunner> tests = new ArrayList<HostTestRunner>();
 
         Map<Boolean, Integer> intervalPerPingStatus = mapIntervalPerPingStatus();
-        int pingAttemptsLimit = valueOf(appProperties.getProperty("ping.attepmts.limit", DEFAULT_ATTEMPTS_LIMIT));
-        int pingTimeout = valueOf(appProperties.getProperty("ping.timeout", DEFAULT_TIMEOUT));
-        int httpStatusTimeout = valueOf(appProperties.getProperty("http.status.timeout", DEFAULT_TIMEOUT));
 
         for (URL url : urls) {
-            PingTest pingTest = new PingTest(url);
-            pingTest.setHttpStatusTestExecutorService(httpStatusTestExecutor);
+            PingTestRunner pingTest = new PingTestRunner(new RandomPingTest(url));
+            pingTest.setTestResults(sharedTestResults);
             pingTest.setPingTestExecutorService(pingTestExecutor);
             pingTest.setIntervalPerPingStatus(intervalPerPingStatus);
-            pingTest.setPingAttemptsLimit(pingAttemptsLimit);
-            pingTest.setPingTimeout(pingTimeout);
-            pingTest.setHttpStatusTimeout(httpStatusTimeout);
-            pingTest.setTestResults(sharedTestResults);
+
+            HttpStatusTestRunner httpStatusTestRunner = new HttpStatusTestRunner(new RandomHttpStatusTest(url));
+            httpStatusTestRunner.setHttpStatusTestExecutor(httpStatusTestExecutor);
+
+            pingTest.setHttpStatusTestRunner(httpStatusTestRunner);
 
             tests.add(pingTest);
         }
@@ -107,9 +110,39 @@ public class HostMonitoringApp {
         return tests;
     }
 
+    private List<HostTestRunner> createSimpleThreadTests(List<URL> urls){
+        Map<String, HostTestRunner> groupedTests = new LinkedHashMap<String, HostTestRunner>(urls.size());
+
+        Map<Boolean, Integer> intervalPerPingStatus = mapIntervalPerPingStatus();
+        int pingAttemptsLimit = valueOf(appProperties.getProperty("ping.attepmts.limit", DEFAULT_ATTEMPTS_LIMIT));
+        int pingTimeout = valueOf(appProperties.getProperty("ping.timeout", DEFAULT_TIMEOUT));
+        int httpStatusTimeout = valueOf(appProperties.getProperty("http.status.timeout", DEFAULT_TIMEOUT));
+
+        for (URL url : urls) {
+            SimpleThreadPingTestRunner pingTest = new SimpleThreadPingTestRunner(url);
+            pingTest.setIntervalPerPingStatus(intervalPerPingStatus);
+            pingTest.setPingAttemptsLimit(pingAttemptsLimit);
+            pingTest.setPingTimeout(pingTimeout);
+            pingTest.setHttpStatusTimeout(httpStatusTimeout);
+            pingTest.setTestResults(sharedTestResults);
+
+            String host = url.getHost();
+
+            String parentHost = host.substring(host.indexOf(".")+1);
+            SimpleThreadPingTestRunner parentTest = (SimpleThreadPingTestRunner)groupedTests.get(parentHost);
+
+            if(parentTest != null)
+                parentTest.addSubTest(pingTest);
+            else
+                groupedTests.put(host, pingTest);
+        }
+
+        return new ArrayList<HostTestRunner>(groupedTests.values());
+    }
+
     private void runTests(){
-        for (PingTest pingTest : pingTests) {
-            pingTest.sumbmit();
+        for (HostTestRunner pingTest : pingTests) {
+            pingTest.submit();
         }
 
     }
@@ -128,11 +161,11 @@ public class HostMonitoringApp {
         return getClass().getClassLoader().getResourceAsStream(filename);
     }
 
-    private Map<URL, UrlTestResult> createInitialTestResults(List<URL> urls){
-        Map<URL, UrlTestResult> sharedTestResults = new ConcurrentHashMap<URL, UrlTestResult>(urls.size());
+    private Map<String, HostTestResult> createInitialTestResults(List<URL> urls){
+        Map<String, HostTestResult> sharedTestResults = new ConcurrentHashMap<String, HostTestResult>(urls.size());
 
         for (URL url : urls) {
-            sharedTestResults.put(url, new UrlTestResult(url, null, null));
+            sharedTestResults.put(url.getHost(), new HostTestResult(url, null, null));
         }
 
         return sharedTestResults;
