@@ -1,4 +1,4 @@
-package edu.san.luc.hosts_monitoring.test;
+package edu.san.luc.hosts_monitoring.runner;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;

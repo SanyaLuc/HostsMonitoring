@@ -1,4 +1,7 @@
-package edu.san.luc.hosts_monitoring.test;
+package edu.san.luc.hosts_monitoring.runner;
+
+import edu.san.luc.hosts_monitoring.test.HostTest;
+import edu.san.luc.hosts_monitoring.test.HostTestResult;
 
 import java.net.URL;
 import java.util.ArrayList;
@@ -28,7 +31,6 @@ public abstract class AbstractPingTestRunner implements HostTestRunner<HostTestR
     @Override
     public HostTestResult call() throws Exception {
         URL url = pingTest.getURL();
-        HostTestResult result;
 
         updateTestStatus(url, null, null);
 
@@ -40,7 +42,7 @@ public abstract class AbstractPingTestRunner implements HostTestRunner<HostTestR
         }
         boolean pingStatus = pingMillis > 0;
 
-        result = updateTestStatus(url, pingStatus, null);
+        HostTestResult result = updateTestStatus(url, pingStatus, null);
         if (pingStatus && httpStatusTestRunner != null) {
             int httpStatus = 0;
             try {

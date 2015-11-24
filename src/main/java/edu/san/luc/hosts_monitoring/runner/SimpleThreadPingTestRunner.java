@@ -1,11 +1,11 @@
-package edu.san.luc.hosts_monitoring.test;
+package edu.san.luc.hosts_monitoring.runner;
 
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
+import edu.san.luc.hosts_monitoring.test.HostTest;
+import edu.san.luc.hosts_monitoring.test.HostTestResult;
+
 import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Future;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -58,6 +58,10 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    public void setThreadPool(ArrayBlockingQueue<Thread> threadPool) {
+        this.threadPool = threadPool;
     }
 
     public void setTestResults(Map<String, HostTestResult> testResults) {

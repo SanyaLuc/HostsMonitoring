@@ -1,4 +1,8 @@
-package edu.san.luc.hosts_monitoring.test;
+package edu.san.luc.hosts_monitoring.runner;
+
+import edu.san.luc.hosts_monitoring.runner.AbstractPingTestRunner;
+import edu.san.luc.hosts_monitoring.test.HostTest;
+import edu.san.luc.hosts_monitoring.test.HostTestResult;
 
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;

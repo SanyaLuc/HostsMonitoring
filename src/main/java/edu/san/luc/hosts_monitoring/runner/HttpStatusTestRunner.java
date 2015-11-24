@@ -1,8 +1,7 @@
-package edu.san.luc.hosts_monitoring.test;
+package edu.san.luc.hosts_monitoring.runner;
 
-import java.net.URL;
-import java.util.Random;
-import java.util.concurrent.Callable;
+import edu.san.luc.hosts_monitoring.test.HostTest;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 

@@ -1,4 +1,4 @@
-package edu.san.luc.hosts_monitoring.test;
+package edu.san.luc.hosts_monitoring.runner;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;

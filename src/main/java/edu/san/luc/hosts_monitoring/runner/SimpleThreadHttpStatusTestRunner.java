@@ -1,4 +1,6 @@
-package edu.san.luc.hosts_monitoring.test;
+package edu.san.luc.hosts_monitoring.runner;
+
+import edu.san.luc.hosts_monitoring.test.HostTest;
 
 import java.util.concurrent.*;
 
@@ -8,6 +10,7 @@ import java.util.concurrent.*;
 public class SimpleThreadHttpStatusTestRunner implements Runnable, HostTestRunner<Integer> {
     private HostTest httpStatusTest;
     private SimpleFuture future;
+    private ArrayBlockingQueue<Thread> threadPool;
 
     public SimpleThreadHttpStatusTestRunner(HostTest httpStatusTest) {
         this.httpStatusTest = httpStatusTest;
@@ -38,5 +41,9 @@ public class SimpleThreadHttpStatusTestRunner implements Runnable, HostTestRunne
     @Override
     public Integer call() throws Exception {
         return httpStatusTest.test();
+    }
+
+    public void setThreadPool(ArrayBlockingQueue<Thread> threadPool) {
+        this.threadPool = threadPool;
     }
 }

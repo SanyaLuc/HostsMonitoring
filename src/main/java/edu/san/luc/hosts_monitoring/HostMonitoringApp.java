@@ -1,5 +1,6 @@
 package edu.san.luc.hosts_monitoring;
 
+import edu.san.luc.hosts_monitoring.runner.*;
 import edu.san.luc.hosts_monitoring.test.*;
 import edu.san.luc.hosts_monitoring.web.HostMonitoringWebServer;
 
@@ -37,7 +38,7 @@ public class HostMonitoringApp {
     private Integer pingTestPoolSize;
     private Integer responseTestPoolSize;
 
-    public HostMonitoringApp(){
+    public HostMonitoringApp() {
         init();
     }
 
@@ -47,8 +48,8 @@ public class HostMonitoringApp {
         HostMonitoringWebServer webServer = new HostMonitoringWebServer();
         webServer.setUrls(app.urls);
         webServer.setTestResults(app.sharedTestResults);
-        
-//        app.runTests();
+
+        app.runTests();
         webServer.start();
     }
 
@@ -68,9 +69,7 @@ public class HostMonitoringApp {
 
             sharedTestResults = createInitialTestResults(urls);
 
-            pingTests = createSimpleThreadTests(urls);
-            pingTests = createTests(urls);
-
+            pingTests = createTests(urls, PingTestRunner.class);
         } catch (Exception e) {
             throw new AppInitializingException("Couldn't initialize the app", e);
         }
@@ -80,7 +79,7 @@ public class HostMonitoringApp {
         List<URL> urls = new ArrayList<URL>();
         Scanner scanner = new Scanner(loadStreamFromClasspath("hosts.list"));
 
-        while(scanner.hasNextLine()){
+        while (scanner.hasNextLine()) {
             String urlLine = scanner.nextLine().trim();
             urls.add(new URL(urlLine));
         }
@@ -88,80 +87,73 @@ public class HostMonitoringApp {
         return urls;
     }
 
-    private List<HostTestRunner> createTests(List<URL> urls){
-        List<HostTestRunner> tests = new ArrayList<HostTestRunner>();
-
-        Map<Boolean, Integer> intervalPerPingStatus = mapIntervalPerPingStatus();
-
-        for (URL url : urls) {
-            PingTestRunner pingTest = new PingTestRunner(new RandomPingTest(url));
-            pingTest.setTestResults(sharedTestResults);
-            pingTest.setPingTestExecutorService(pingTestExecutor);
-            pingTest.setIntervalPerPingStatus(intervalPerPingStatus);
-
-            HttpStatusTestRunner httpStatusTestRunner = new HttpStatusTestRunner(new RandomHttpStatusTest(url));
-            httpStatusTestRunner.setHttpStatusTestExecutor(httpStatusTestExecutor);
-
-            pingTest.setHttpStatusTestRunner(httpStatusTestRunner);
-
-            tests.add(pingTest);
-        }
-
-        return tests;
-    }
-
-    private List<HostTestRunner> createSimpleThreadTests(List<URL> urls){
+    private List<HostTestRunner> createTests(List<URL> urls, Class<? extends AbstractPingTestRunner> type) {
         Map<String, HostTestRunner> groupedTests = new LinkedHashMap<String, HostTestRunner>(urls.size());
 
         Map<Boolean, Integer> intervalPerPingStatus = mapIntervalPerPingStatus();
-        int pingAttemptsLimit = valueOf(appProperties.getProperty("ping.attepmts.limit", DEFAULT_ATTEMPTS_LIMIT));
-        int pingTimeout = valueOf(appProperties.getProperty("ping.timeout", DEFAULT_TIMEOUT));
-        int httpStatusTimeout = valueOf(appProperties.getProperty("http.status.timeout", DEFAULT_TIMEOUT));
 
         for (URL url : urls) {
-            SimpleThreadPingTestRunner pingTest = new SimpleThreadPingTestRunner(url);
-            pingTest.setIntervalPerPingStatus(intervalPerPingStatus);
-            pingTest.setPingAttemptsLimit(pingAttemptsLimit);
-            pingTest.setPingTimeout(pingTimeout);
-            pingTest.setHttpStatusTimeout(httpStatusTimeout);
-            pingTest.setTestResults(sharedTestResults);
+            HostTest test = new RandomPingTest(url);
+
+            AbstractPingTestRunner pingTestRunner = type == PingTestRunner.class ?
+                    createPingTestRunner(test) :
+                    createSimpleThreadPingTestRunner(test);
+
+            pingTestRunner.setIntervalPerPingStatus(intervalPerPingStatus);
+            pingTestRunner.setTestResults(sharedTestResults);
+
+            SimpleThreadHttpStatusTestRunner httpStatusTestRunner = new SimpleThreadHttpStatusTestRunner(new RandomHttpStatusTest(url));
+
+            pingTestRunner.setHttpStatusTestRunner(httpStatusTestRunner);
 
             String host = url.getHost();
 
-            String parentHost = host.substring(host.indexOf(".")+1);
-            SimpleThreadPingTestRunner parentTest = (SimpleThreadPingTestRunner)groupedTests.get(parentHost);
+            String parentHost = host.substring(host.indexOf(".") + 1);
+            AbstractPingTestRunner parentTest = (AbstractPingTestRunner) groupedTests.get(parentHost);
 
-            if(parentTest != null)
-                parentTest.addSubTest(pingTest);
+            if (parentTest != null)
+                parentTest.addSubTest(pingTestRunner);
             else
-                groupedTests.put(host, pingTest);
+                groupedTests.put(host, pingTestRunner);
         }
 
-        return new ArrayList<HostTestRunner>(groupedTests.values());
+        return new ArrayList<>(groupedTests.values());
     }
 
-    private void runTests(){
+    private PingTestRunner createPingTestRunner(HostTest test) {
+        PingTestRunner pingTestRunner = new PingTestRunner(test);
+        pingTestRunner.setPingTestExecutorService(pingTestExecutor);
+
+        return pingTestRunner;
+    }
+
+    private SimpleThreadPingTestRunner createSimpleThreadPingTestRunner(HostTest test) {
+        SimpleThreadPingTestRunner pingTestRunner = new SimpleThreadPingTestRunner(test);
+
+        return pingTestRunner;
+    }
+
+    private void runTests() {
         for (HostTestRunner pingTest : pingTests) {
             pingTest.submit();
         }
-
     }
 
-    private Map<Boolean, Integer> mapIntervalPerPingStatus(){
+    private Map<Boolean, Integer> mapIntervalPerPingStatus() {
         final int pingFailureInterval = valueOf(appProperties.getProperty("ping.failure.retry.interval", DEFAULT_PING_INTERVAL));
         final int pingSuccessInterval = valueOf(appProperties.getProperty("ping.success.retry.interval", DEFAULT_PING_INTERVAL));
 
-        return new HashMap<Boolean, Integer>(){{
+        return new HashMap<Boolean, Integer>() {{
             put(PING_FAILED, pingFailureInterval);
             put(PING_OK, pingSuccessInterval);
         }};
     }
 
-    private InputStream loadStreamFromClasspath(String filename){
+    private InputStream loadStreamFromClasspath(String filename) {
         return getClass().getClassLoader().getResourceAsStream(filename);
     }
 
-    private Map<String, HostTestResult> createInitialTestResults(List<URL> urls){
+    private Map<String, HostTestResult> createInitialTestResults(List<URL> urls) {
         Map<String, HostTestResult> sharedTestResults = new ConcurrentHashMap<String, HostTestResult>(urls.size());
 
         for (URL url : urls) {
