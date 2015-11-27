@@ -5,6 +5,7 @@ import edu.san.luc.hosts_monitoring.test.HostTestResult;
 
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -35,28 +36,41 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
 
     @Override
     public void run() {
-        final ReentrantLock lock = this.lock;
-        try {
-            lock.lockInterruptibly();
+        if(barrier == null){
+            final ReentrantLock lock = this.lock;
             try {
-                for (;;) {
-                    if(future == null)
-                        throw new IllegalStateException();
-                    try {
-                        HostTestResult result = call();
-                        future.setResult(result);
+                lock.lockInterruptibly();
+                try {
+                    for (;;) {
+                        testHost();
 
-                        int delay = intervalPerPingStatus.get(result.getPingStatus());
-                        available.await(delay, SECONDS);
-                    } catch (Exception e) {
-                        future.setException(e);
+                        HostTestResult result = future.get();
+                        if(result != null){
+                            int delay = intervalPerPingStatus.get(result.getPingStatus());
+                            available.await(delay, SECONDS);
+                        }
                     }
+                } catch (ExecutionException e) {
+                    e.printStackTrace();
+                } finally {
+                    lock.unlock();
                 }
-            } finally {
-                lock.unlock();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        } else {
+            testHost();
+        }
+    }
+
+    private void testHost(){
+        if(future == null)
+            throw new IllegalStateException();
+        try {
+            HostTestResult result = call();
+            future.setResult(result);
+        } catch (Exception e) {
+            future.setException(e);
         }
     }
 

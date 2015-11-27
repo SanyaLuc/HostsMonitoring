@@ -1,6 +1,5 @@
 package edu.san.luc.hosts_monitoring.runner;
 
-import edu.san.luc.hosts_monitoring.runner.AbstractPingTestRunner;
 import edu.san.luc.hosts_monitoring.test.HostTest;
 import edu.san.luc.hosts_monitoring.test.HostTestResult;
 
@@ -28,8 +27,10 @@ public class PingTestRunner extends AbstractPingTestRunner {
     public HostTestResult call() throws Exception {
         HostTestResult result = super.call();
 
-        int delay = intervalPerPingStatus.get(result.getPingStatus());
-        pingTestExecutorService.schedule(this, delay, SECONDS);
+        if(barrier == null){
+            int delay = intervalPerPingStatus.get(result.getPingStatus());
+            pingTestExecutorService.schedule(this, delay, SECONDS);
+        }
 
         return result;
     }

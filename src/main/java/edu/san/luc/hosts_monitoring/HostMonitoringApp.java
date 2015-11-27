@@ -55,7 +55,6 @@ public class HostMonitoringApp {
 
     public void init() {
         try {
-
             appProperties = new Properties();
             appProperties.load(loadStreamFromClasspath("app.properties"));
 
@@ -69,7 +68,8 @@ public class HostMonitoringApp {
 
             sharedTestResults = createInitialTestResults(urls);
 
-            pingTests = createTests(urls, PingTestRunner.class);
+//            pingTests = createTests(urls, PingTestRunner.class);
+            pingTests = createTests(urls, SimpleThreadPingTestRunner.class);
         } catch (Exception e) {
             throw new AppInitializingException("Couldn't initialize the app", e);
         }

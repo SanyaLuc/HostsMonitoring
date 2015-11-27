@@ -7,6 +7,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Future;
 
 /**
@@ -16,13 +17,14 @@ public abstract class AbstractPingTestRunner implements HostTestRunner<HostTestR
 
     protected HostTest pingTest;
 
-    protected List<AbstractPingTestRunner> subTests = new ArrayList<>();
+    protected List<AbstractPingTestRunner> subTestRunners = new ArrayList<>();
     protected HostTestRunner<Integer> httpStatusTestRunner;
 
     protected Map<Boolean, Integer> intervalPerPingStatus;
 
     protected Map<String, HostTestResult> testResults;
 
+    protected CyclicBarrier barrier;
 
     public AbstractPingTestRunner(HostTest pingTest) {
         this.pingTest = pingTest;
@@ -30,6 +32,26 @@ public abstract class AbstractPingTestRunner implements HostTestRunner<HostTestR
 
     @Override
     public HostTestResult call() throws Exception {
+        testSubTests();
+
+        return testHost();
+    }
+
+    private void testSubTests() throws Exception {
+        if(subTestRunners.isEmpty())
+            return;
+
+        CyclicBarrier barrier = new CyclicBarrier(subTestRunners.size()+1);
+
+        for(AbstractPingTestRunner subTestRunner : subTestRunners){
+            subTestRunner.barrier = barrier;
+            subTestRunner.submit();
+        }
+
+        barrier.await();
+    }
+
+    private HostTestResult testHost() throws Exception{
         URL url = pingTest.getURL();
 
         updateTestStatus(url, null, null);
@@ -54,6 +76,9 @@ public abstract class AbstractPingTestRunner implements HostTestRunner<HostTestR
 
             result = updateTestStatus(url, pingStatus, httpStatus);
         }
+
+        if(barrier != null)
+            barrier.await();
 
         return result;
     }
@@ -81,6 +106,6 @@ public abstract class AbstractPingTestRunner implements HostTestRunner<HostTestR
     }
 
     public void addSubTest(AbstractPingTestRunner subTest) {
-        this.subTests.add(subTest);
+        this.subTestRunners.add(subTest);
     }
 }
