@@ -3,21 +3,23 @@ package edu.san.luc.hosts_monitoring.web;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import edu.san.luc.hosts_monitoring.test.UrlTestResult;
+import edu.san.luc.hosts_monitoring.test.HostTestResult;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URL;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Created by sanya on 15.09.15.
  */
 public class HostMonitoringWebServer {
-    private Map<URL, UrlTestResult> testResults;
+    private Map<String, HostTestResult> testResults;
+    private List<URL> urls;
 
-    public void setTestResults(Map<URL, UrlTestResult> testResults) {
+    public void setTestResults(Map<String, HostTestResult> testResults) {
         this.testResults = testResults;
     }
 
@@ -61,24 +63,36 @@ public class HostMonitoringWebServer {
         private String renderTestStatusTable(){
             StringBuilder tableBody = new StringBuilder();
 
-            for (UrlTestResult urlTestResult : testResults.values()) {
-                String url = urlTestResult.getUrl().toString();
+            for (URL url : urls) {
+                HostTestResult urlTestResult = testResults.get(url.getHost());
+                String formattedUrl = renderURLWithDomainLevel(urlTestResult);
                 String pingStatus = renderPingStatus(urlTestResult);
                 String httpStatus = renderHttpStatus(urlTestResult);
 
-                tableBody.append(String.format(STATUS_ROW_TEMPLATE, url, pingStatus, httpStatus));
+                tableBody.append(String.format(STATUS_ROW_TEMPLATE, formattedUrl, pingStatus, httpStatus));
             }
             return tableBody.toString();
         }
 
-        private String renderPingStatus(UrlTestResult urlTestResult){
+        private String renderURLWithDomainLevel(HostTestResult urlTestResult){
+            String levelPadding = "";
+
+            int levelNumber = urlTestResult.getUrl().getHost().split("\\.").length - 1;
+            for (int i = 1; i < levelNumber; i++) {
+                levelPadding += "&nbsp&nbsp";
+            }
+
+            return levelPadding + urlTestResult.getUrl();
+        }
+
+        private String renderPingStatus(HostTestResult urlTestResult){
             if(urlTestResult.getPingStatus() == null)
                 return "ONGOING";
 
             return urlTestResult.getPingStatus() ? "OK" : "FAILED";
         }
 
-        private String renderHttpStatus(UrlTestResult urlTestResult){
+        private String renderHttpStatus(HostTestResult urlTestResult){
             if(urlTestResult.getPingStatus() == null || !urlTestResult.getPingStatus())
                 return "";
 
@@ -89,4 +103,7 @@ public class HostMonitoringWebServer {
         }
     }
 
+    public void setUrls(List<URL> urls) {
+        this.urls = urls;
+    }
 }

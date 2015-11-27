@@ -5,7 +5,7 @@ import java.net.URL;
 /**
  * Created by sanya on 18.09.15.
  */
-public final class UrlTestResult {
+public final class HostTestResult {
     public static boolean PING_OK = true;
     public static boolean PING_FAILED = false;
 
@@ -16,7 +16,7 @@ public final class UrlTestResult {
     private Boolean pingStatus;
     private Integer httpStatus;
 
-    public UrlTestResult(URL url, Boolean pingStatus, Integer httpStatus) {
+    public HostTestResult(URL url, Boolean pingStatus, Integer httpStatus) {
         this.url = url;
         this.pingStatus = pingStatus;
         this.httpStatus = httpStatus;
