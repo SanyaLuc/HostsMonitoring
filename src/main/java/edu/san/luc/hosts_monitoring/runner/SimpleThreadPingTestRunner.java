@@ -18,7 +18,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implements Runnable {
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition available = lock.newCondition();
-    private ArrayBlockingQueue<Thread> threadPool;
+    private BoundedPriorityBlockingQueue<SimpleThreadPingTestRunner> runnerPool;
     private SimpleFuture<HostTestResult> future;
 
     public SimpleThreadPingTestRunner(HostTest pingTest) {
@@ -36,18 +36,19 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
 
     @Override
     public void run() {
-        if(barrier == null){
-            final ReentrantLock lock = this.lock;
+        SimpleThreadPingTestRunner runner = this;
+        if(runner.barrier == null){
+            final ReentrantLock lock = runner.lock;
             try {
                 lock.lockInterruptibly();
                 try {
                     for (;;) {
                         testHost();
 
-                        HostTestResult result = future.get();
+                        HostTestResult result = runner.future.get();
                         if(result != null){
-                            int delay = intervalPerPingStatus.get(result.getPingStatus());
-                            available.await(delay, SECONDS);
+                            int delay = runner.intervalPerPingStatus.get(result.getPingStatus());
+                            runner.available.await(delay, SECONDS);
                         }
                     }
                 } catch (ExecutionException e) {
@@ -74,8 +75,8 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
         }
     }
 
-    public void setThreadPool(ArrayBlockingQueue<Thread> threadPool) {
-        this.threadPool = threadPool;
+    public void setRunnerPool(BoundedPriorityBlockingQueue<SimpleThreadPingTestRunner> runnerPool) {
+        this.runnerPool = runnerPool;
     }
 
     public void setTestResults(Map<String, HostTestResult> testResults) {
