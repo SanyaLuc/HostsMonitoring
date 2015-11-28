@@ -9,14 +9,8 @@ import java.util.concurrent.TimeoutException;
  * Created by sanya on 22.11.15.
  */
 public class SimpleFuture<T> implements Future<T> {
-    private Thread thread;
-
     private T result;
     private Exception exception;
-
-    public SimpleFuture(Thread thread) {
-        this.thread = thread;
-    }
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
@@ -34,16 +28,20 @@ public class SimpleFuture<T> implements Future<T> {
     }
 
     @Override
-    public T get() throws InterruptedException, ExecutionException {
-        thread.join();
-
-        if (exception != null) {
-            if (exception instanceof InterruptedException)
-                throw (InterruptedException) exception;
-            else
-                throw new ExecutionException(exception);
-        } else {
-            return result;
+    public synchronized T get() throws InterruptedException, ExecutionException {
+        for(;;){
+            if(isDone()){
+                if (exception != null) {
+                    if (exception instanceof InterruptedException)
+                        throw (InterruptedException) exception;
+                    else
+                        throw new ExecutionException(exception);
+                } else {
+                    return result;
+                }
+            } else {
+                this.wait();
+            }
         }
     }
 
@@ -52,11 +50,13 @@ public class SimpleFuture<T> implements Future<T> {
         throw new UnsupportedOperationException();
     }
 
-    public void setResult(T result) {
+    public synchronized void setResult(T result) {
         this.result = result;
+        this.notifyAll();
     }
 
-    public void setException(Exception exception) {
+    public synchronized void setException(Exception exception) {
         this.exception = exception;
+        this.notifyAll();
     }
 }
