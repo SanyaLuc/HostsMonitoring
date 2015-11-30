@@ -19,7 +19,7 @@ public class SimpleThreadHttpStatusTestRunner implements Runnable, HostTestRunne
     @Override
     public Future<Integer> submit() {
         Thread t = new Thread(this);
-        future = new SimpleFuture(t);
+        future = new SimpleFuture();
 
         t.start();
 

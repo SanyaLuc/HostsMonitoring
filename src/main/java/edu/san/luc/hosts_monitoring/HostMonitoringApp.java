@@ -27,13 +27,14 @@ public class HostMonitoringApp {
     public static final String DEFAULT_TIMEOUT = "1000";
     public static final String DEFAULT_PING_INTERVAL = "60";
 
+    private SimpleRunnerPool<SimpleThreadPingTestRunner> pingTestRunnerPool;
     private ScheduledExecutorService pingTestExecutor;
     private ExecutorService httpStatusTestExecutor;
+
     private List<HostTestRunner> pingTests;
-
     private List<URL> urls;
-    private Map<String, HostTestResult> sharedTestResults;
 
+    private Map<String, HostTestResult> sharedTestResults;
     private Properties appProperties;
     private Integer pingTestPoolSize;
     private Integer responseTestPoolSize;
@@ -63,6 +64,8 @@ public class HostMonitoringApp {
 
             pingTestExecutor = newScheduledThreadPool(pingTestPoolSize);
             httpStatusTestExecutor = newFixedThreadPool(responseTestPoolSize);
+
+            pingTestRunnerPool = new SimpleRunnerPool<SimpleThreadPingTestRunner>(pingTestPoolSize);
 
             urls = loadUrls();
 
@@ -129,6 +132,7 @@ public class HostMonitoringApp {
 
     private SimpleThreadPingTestRunner createSimpleThreadPingTestRunner(HostTest test) {
         SimpleThreadPingTestRunner pingTestRunner = new SimpleThreadPingTestRunner(test);
+        pingTestRunner.setRunnerPool(pingTestRunnerPool);
 
         return pingTestRunner;
     }

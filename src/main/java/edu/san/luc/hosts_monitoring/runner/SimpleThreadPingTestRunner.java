@@ -10,6 +10,7 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static edu.san.luc.hosts_monitoring.runner.SimpleRunnerPool.PutRunnerListener;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -21,22 +22,20 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
     private final Condition available = lock.newCondition();
     private SimpleRunnerPool<SimpleThreadPingTestRunner> runnerPool;
     private SimpleFuture<HostTestResult> future;
-
-    //dynamic fields
-    private Thread currentThread;
-    private Long triggerTime;
+    private Long triggerTime = 0L;
 
     public SimpleThreadPingTestRunner(HostTest pingTest) {
         super(pingTest);
     }
 
     public Future<HostTestResult> submit() {
+        future = new SimpleFuture();
+
         if (runnerPool.put(this)) {
             Thread t = new Thread(this);
             t.start();
         }
 
-        future = new SimpleFuture();
         return future;
     }
 
@@ -63,6 +62,7 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
     @Override
     public void run() {
         try {
+            lock.lockInterruptibly();
             for (; ; ) {
                 SimpleThreadPingTestRunner runner = runnerPool.take();
 
@@ -73,20 +73,13 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
                         runner.resubmit();
                     }
                 } else {
-                    final ReentrantLock lock = runner.lock;
-                    try {
-                        lock.lockInterruptibly();
-                        runner.available.await(delay, NANOSECONDS);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    } finally {
-                        lock.unlock();
-                    }
-
+                    available.await(delay, NANOSECONDS);
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -98,8 +91,23 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
         return triggerTime - System.nanoTime();
     }
 
+    private void takeNewRunner(){
+        try {
+            lock.lockInterruptibly();
+            available.signal();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public void setRunnerPool(SimpleRunnerPool<SimpleThreadPingTestRunner> runnerPool) {
         this.runnerPool = runnerPool;
+
+        if(runnerPool != null){
+            runnerPool.addPutListener(runner -> takeNewRunner());
+        }
     }
 
     public void setTestResults(Map<String, HostTestResult> testResults) {
