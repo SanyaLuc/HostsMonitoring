@@ -11,6 +11,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static edu.san.luc.hosts_monitoring.runner.SimpleRunnerPool.PutRunnerListener;
+import static java.lang.System.nanoTime;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -40,12 +41,18 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
     }
 
     private void resubmit() throws Exception {
-        HostTestResult result = future.get();
-        if (result != null) {
-            int delay = intervalPerPingStatus.get(result.getPingStatus());
-            triggerTime = triggerTime(delay);
-            runnerPool.put(this);
+        if(future.isDone()){
+            HostTestResult result = future.get();
+            if (result != null) {
+                int delay = intervalPerPingStatus.get(result.getPingStatus());
+                triggerTime = triggerTime(delay);
+                future = new SimpleFuture();
+            }
+        } else {
+            triggerTime = nanoTime();
         }
+
+        runnerPool.put(this);
     }
 
     private void testHost() {
@@ -63,10 +70,10 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
     public void run() {
         try {
             lock.lockInterruptibly();
-            for (; ; ) {
-                SimpleThreadPingTestRunner runner = runnerPool.take();
+            for (;;) {
+                final SimpleThreadPingTestRunner runner = runnerPool.take();
 
-                final long delay = getDelay();
+                final long delay = runner.getDelay();
                 if (delay < 0) {
                     runner.testHost();
                     if (runner.barrier == null) {
@@ -74,6 +81,7 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
                     }
                 } else {
                     available.await(delay, NANOSECONDS);
+                    runner.resubmit();
                 }
             }
         } catch (Exception e) {
@@ -84,11 +92,11 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
     }
 
     private static long triggerTime(int delay) {
-        return System.nanoTime() + SECONDS.toNanos(delay);
+        return nanoTime() + SECONDS.toNanos(delay);
     }
 
     private long getDelay() {
-        return triggerTime - System.nanoTime();
+        return triggerTime - nanoTime();
     }
 
     private void takeNewRunner(){
