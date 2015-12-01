@@ -10,14 +10,14 @@ import java.util.concurrent.*;
 public class SimpleThreadHttpStatusTestRunner implements Runnable, HostTestRunner<Integer> {
     private HostTest httpStatusTest;
     private SimpleFuture future;
-    private ArrayBlockingQueue<Thread> threadPool;
+    private SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> threadPool;
 
     public SimpleThreadHttpStatusTestRunner(HostTest httpStatusTest) {
         this.httpStatusTest = httpStatusTest;
     }
 
     @Override
-    public Future<Integer> submit() {
+    public Future<Integer> start() {
         Thread t = new Thread(this);
         future = new SimpleFuture();
 
@@ -43,7 +43,7 @@ public class SimpleThreadHttpStatusTestRunner implements Runnable, HostTestRunne
         return httpStatusTest.test();
     }
 
-    public void setThreadPool(ArrayBlockingQueue<Thread> threadPool) {
+    public void setThreadPool(SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> threadPool) {
         this.threadPool = threadPool;
     }
 }

@@ -19,7 +19,7 @@ public class PingTestRunner extends AbstractPingTestRunner {
         super(pingTest);
     }
 
-    public Future<HostTestResult> submit() {
+    public Future<HostTestResult> start() {
         return pingTestExecutorService.submit(this);
     }
 

@@ -28,12 +28,13 @@ public class HostMonitoringApp {
     public static final String DEFAULT_PING_INTERVAL = "60";
 
     private SimpleRunnerPool<SimpleThreadPingTestRunner> pingTestRunnerPool;
+    private SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> httpStatusTestRunnerPool;
     private ScheduledExecutorService pingTestExecutor;
+
     private ExecutorService httpStatusTestExecutor;
-
     private List<HostTestRunner> pingTests;
-    private List<URL> urls;
 
+    private List<URL> urls;
     private Map<String, HostTestResult> sharedTestResults;
     private Properties appProperties;
     private Integer pingTestPoolSize;
@@ -65,7 +66,8 @@ public class HostMonitoringApp {
             pingTestExecutor = newScheduledThreadPool(pingTestPoolSize);
             httpStatusTestExecutor = newFixedThreadPool(responseTestPoolSize);
 
-            pingTestRunnerPool = new SimpleRunnerPool<SimpleThreadPingTestRunner>(pingTestPoolSize);
+            pingTestRunnerPool = new SimpleRunnerPool<>(pingTestPoolSize);
+            httpStatusTestRunnerPool = new SimpleRunnerPool<>(responseTestPoolSize);
 
             urls = loadUrls();
 
@@ -96,16 +98,18 @@ public class HostMonitoringApp {
         Map<Boolean, Integer> intervalPerPingStatus = mapIntervalPerPingStatus();
 
         for (URL url : urls) {
-            HostTest test = new RandomPingTest(url);
-
+            HostTest pingTest = new RandomPingTest(url);
             AbstractPingTestRunner pingTestRunner = type == PingTestRunner.class ?
-                    createPingTestRunner(test) :
-                    createSimpleThreadPingTestRunner(test);
+                    createPingTestRunner(pingTest) :
+                    createSimpleThreadPingTestRunner(pingTest);
 
             pingTestRunner.setIntervalPerPingStatus(intervalPerPingStatus);
             pingTestRunner.setTestResults(sharedTestResults);
 
-            SimpleThreadHttpStatusTestRunner httpStatusTestRunner = new SimpleThreadHttpStatusTestRunner(new RandomHttpStatusTest(url));
+            RandomHttpStatusTest httpStatusTest = new RandomHttpStatusTest(url);
+            HostTestRunner httpStatusTestRunner = type == PingTestRunner.class ?
+                    createHttpStatusTestRunner(httpStatusTest):
+                    createHSimpleThreadHttpStatusTestRunner(httpStatusTest);
 
             pingTestRunner.setHttpStatusTestRunner(httpStatusTestRunner);
 
@@ -121,6 +125,20 @@ public class HostMonitoringApp {
         }
 
         return new ArrayList<>(groupedTests.values());
+    }
+
+    private SimpleThreadHttpStatusTestRunner createHSimpleThreadHttpStatusTestRunner(HostTest test) {
+        SimpleThreadHttpStatusTestRunner httpStatusTestRunner = new SimpleThreadHttpStatusTestRunner(test);
+        httpStatusTestRunner.setThreadPool(httpStatusTestRunnerPool);
+
+        return httpStatusTestRunner;
+    }
+
+    private HttpStatusTestRunner createHttpStatusTestRunner(HostTest test) {
+        HttpStatusTestRunner httpStatusTestRunner = new HttpStatusTestRunner(test);
+        httpStatusTestRunner.setHttpStatusTestExecutor(httpStatusTestExecutor);
+
+        return httpStatusTestRunner;
     }
 
     private PingTestRunner createPingTestRunner(HostTest test) {
@@ -139,7 +157,7 @@ public class HostMonitoringApp {
 
     private void runTests() {
         for (HostTestRunner pingTest : pingTests) {
-            pingTest.submit();
+            pingTest.start();
         }
     }
 

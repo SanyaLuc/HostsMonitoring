@@ -7,6 +7,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Future;
 
@@ -24,7 +25,8 @@ public abstract class AbstractPingTestRunner implements HostTestRunner<HostTestR
 
     protected Map<String, HostTestResult> testResults;
 
-    protected CyclicBarrier barrier;
+//    protected CyclicBarrier barrier;
+    protected CountDownLatch barrier;
 
     public AbstractPingTestRunner(HostTest pingTest) {
         this.pingTest = pingTest;
@@ -41,11 +43,12 @@ public abstract class AbstractPingTestRunner implements HostTestRunner<HostTestR
         if(subTestRunners.isEmpty())
             return;
 
-        CyclicBarrier barrier = new CyclicBarrier(subTestRunners.size()+1);
+//        CyclicBarrier barrier = new CyclicBarrier(subTestRunners.size()+1);
+        CountDownLatch barrier = new CountDownLatch(subTestRunners.size());
 
         for(AbstractPingTestRunner subTestRunner : subTestRunners){
             subTestRunner.barrier = barrier;
-            subTestRunner.submit();
+            subTestRunner.start();
         }
 
         barrier.await();
@@ -68,7 +71,7 @@ public abstract class AbstractPingTestRunner implements HostTestRunner<HostTestR
         if (pingStatus && httpStatusTestRunner != null) {
             int httpStatus = 0;
             try {
-                Future<Integer> future = httpStatusTestRunner.submit();
+                Future<Integer> future = httpStatusTestRunner.start();
                 httpStatus = future.get();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -78,7 +81,8 @@ public abstract class AbstractPingTestRunner implements HostTestRunner<HostTestR
         }
 
         if(barrier != null)
-            barrier.await();
+            barrier.countDown();
+//            barrier.await();
 
         return result;
     }

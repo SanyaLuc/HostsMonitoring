@@ -4,13 +4,10 @@ import edu.san.luc.hosts_monitoring.test.HostTest;
 import edu.san.luc.hosts_monitoring.test.HostTestResult;
 
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static edu.san.luc.hosts_monitoring.runner.SimpleRunnerPool.PutRunnerListener;
 import static java.lang.System.nanoTime;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -22,16 +19,14 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition available = lock.newCondition();
     private SimpleRunnerPool<SimpleThreadPingTestRunner> runnerPool;
-    private SimpleFuture<HostTestResult> future;
+    private SimpleFuture<HostTestResult> future = new SimpleFuture();
     private Long triggerTime = 0L;
 
     public SimpleThreadPingTestRunner(HostTest pingTest) {
         super(pingTest);
     }
 
-    public Future<HostTestResult> submit() {
-        future = new SimpleFuture();
-
+    public Future<HostTestResult> start() {
         if (runnerPool.put(this)) {
             Thread t = new Thread(this);
             t.start();
@@ -40,27 +35,17 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
         return future;
     }
 
-    private void resubmit() throws Exception {
-        if(future.isDone()){
-            HostTestResult result = future.get();
-            if (result != null) {
-                int delay = intervalPerPingStatus.get(result.getPingStatus());
-                triggerTime = triggerTime(delay);
-                future = new SimpleFuture();
-            }
-        } else {
-            triggerTime = nanoTime();
-        }
-
+    private void restart() throws Exception {
+        HostTestResult result = future.get();
+        boolean pingStatus = result != null ? result.getPingStatus() : false;
+        int delay = intervalPerPingStatus.get(pingStatus);
+        triggerTime = triggerTime(delay);
         runnerPool.put(this);
     }
 
     private void testHost() {
-        if (future == null)
-            throw new IllegalStateException();
         try {
-            HostTestResult result = call();
-            future.setResult(result);
+            future.setResult(call());
         } catch (Exception e) {
             future.setException(e);
         }
@@ -70,18 +55,19 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
     public void run() {
         try {
             lock.lockInterruptibly();
-            for (;;) {
+            for (; ; ) {
                 final SimpleThreadPingTestRunner runner = runnerPool.take();
 
                 final long delay = runner.getDelay();
+//                System.out.println("#### "+runner.pingTest.getURL()+" @@@@@ " + Thread.currentThread());
                 if (delay < 0) {
                     runner.testHost();
                     if (runner.barrier == null) {
-                        runner.resubmit();
+                        runner.restart();
                     }
                 } else {
                     available.await(delay, NANOSECONDS);
-                    runner.resubmit();
+                    runnerPool.put(runner);
                 }
             }
         } catch (Exception e) {
@@ -99,21 +85,22 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
         return triggerTime - nanoTime();
     }
 
-    private void takeNewRunner(){
-        try {
-            lock.lockInterruptibly();
-            available.signal();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            lock.unlock();
-        }
+    private void takeNewRunner() {
+        available.signal();
+//        try {
+//            lock.lockInterruptibly();
+//            //available.signal();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        } finally {
+//            lock.unlock();
+//        }
     }
 
     public void setRunnerPool(SimpleRunnerPool<SimpleThreadPingTestRunner> runnerPool) {
         this.runnerPool = runnerPool;
 
-        if(runnerPool != null){
+        if (runnerPool != null) {
             runnerPool.addPutListener(runner -> takeNewRunner());
         }
     }

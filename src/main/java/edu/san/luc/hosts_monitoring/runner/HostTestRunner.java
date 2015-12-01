@@ -7,5 +7,5 @@ import java.util.concurrent.Future;
  * Created by sanya on 13.11.15.
  */
 public interface HostTestRunner<T> extends Callable<T> {
-    Future<T> submit();
+    Future<T> start();
 }

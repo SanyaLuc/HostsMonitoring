@@ -17,7 +17,7 @@ public class HttpStatusTestRunner implements HostTestRunner<Integer> {
     }
 
     @Override
-    public Future<Integer> submit() {
+    public Future<Integer> start() {
         return httpStatusTestExecutor.submit(this);
     }
 

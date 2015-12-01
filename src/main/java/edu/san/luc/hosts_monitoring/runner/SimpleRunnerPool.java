@@ -8,19 +8,29 @@ import java.util.concurrent.PriorityBlockingQueue;
  * Created by sanya on 28.11.15.
  */
 public class SimpleRunnerPool<T extends HostTestRunner> {
-    private int size;
+    private int limit;
+    private int runnerNumber;
     private PriorityBlockingQueue<T> queue;
     private List<PutRunnerListener<T>> putListeners = new LinkedList<PutRunnerListener<T>>();
 
-    public SimpleRunnerPool(int size) {
-        this.size = size;
-        this.queue = new PriorityBlockingQueue<>(size);
+    public SimpleRunnerPool(int limit) {
+        this.limit = limit;
+        this.queue = new PriorityBlockingQueue<>(limit);
     }
 
     public boolean put(T runner) {
         queue.put(runner);
 
-        return queue.size() < size;
+        for (PutRunnerListener<T> putListener : putListeners) {
+            putListener.handle(runner);
+        }
+
+        if(runnerNumber < limit){
+            runnerNumber++;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     public T take() throws InterruptedException {
@@ -28,7 +38,7 @@ public class SimpleRunnerPool<T extends HostTestRunner> {
     }
 
     public int size() {
-        return size;
+        return limit;
     }
 
     public void addPutListener(PutRunnerListener<T> listener){
