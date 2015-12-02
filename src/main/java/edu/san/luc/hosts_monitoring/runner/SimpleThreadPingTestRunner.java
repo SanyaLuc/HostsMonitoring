@@ -54,7 +54,6 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
     @Override
     public void run() {
         try {
-            lock.lockInterruptibly();
             for (; ; ) {
                 final SimpleThreadPingTestRunner runner = runnerPool.take();
 
@@ -66,14 +65,17 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
                         runner.restart();
                     }
                 } else {
-                    available.await(delay, NANOSECONDS);
+                    lock.lockInterruptibly();
+                    try {
+                        available.await(delay, NANOSECONDS);
+                    } finally {
+                        lock.unlock();
+                    }
                     runnerPool.put(runner);
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-            lock.unlock();
         }
     }
 
@@ -86,15 +88,18 @@ public class SimpleThreadPingTestRunner extends AbstractPingTestRunner implement
     }
 
     private void takeNewRunner() {
-        available.signal();
-//        try {
-//            lock.lockInterruptibly();
-//            //available.signal();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        } finally {
-//            lock.unlock();
-//        }
+        try {
+            lock.lockInterruptibly();
+            try {
+                available.signal();
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                lock.unlock();
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     public void setRunnerPool(SimpleRunnerPool<SimpleThreadPingTestRunner> runnerPool) {

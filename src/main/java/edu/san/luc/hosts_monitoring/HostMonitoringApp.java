@@ -129,7 +129,7 @@ public class HostMonitoringApp {
 
     private SimpleThreadHttpStatusTestRunner createHSimpleThreadHttpStatusTestRunner(HostTest test) {
         SimpleThreadHttpStatusTestRunner httpStatusTestRunner = new SimpleThreadHttpStatusTestRunner(test);
-        httpStatusTestRunner.setThreadPool(httpStatusTestRunnerPool);
+        httpStatusTestRunner.setRunnerPool(httpStatusTestRunnerPool);
 
         return httpStatusTestRunner;
     }

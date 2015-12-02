@@ -4,13 +4,15 @@ import edu.san.luc.hosts_monitoring.test.HostTest;
 
 import java.util.concurrent.*;
 
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
+
 /**
  * Created by sanya on 16.09.15.
  */
-public class SimpleThreadHttpStatusTestRunner implements Runnable, HostTestRunner<Integer> {
+public class SimpleThreadHttpStatusTestRunner implements Runnable, Comparable<SimpleThreadHttpStatusTestRunner>, HostTestRunner<Integer> {
     private HostTest httpStatusTest;
-    private SimpleFuture future;
-    private SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> threadPool;
+    private SimpleFuture future = new SimpleFuture();
+    private SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> runnerPool;
 
     public SimpleThreadHttpStatusTestRunner(HostTest httpStatusTest) {
         this.httpStatusTest = httpStatusTest;
@@ -18,19 +20,27 @@ public class SimpleThreadHttpStatusTestRunner implements Runnable, HostTestRunne
 
     @Override
     public Future<Integer> start() {
-        Thread t = new Thread(this);
-        future = new SimpleFuture();
-
-        t.start();
+        if (runnerPool.put(this)) {
+            Thread t = new Thread(this);
+            t.start();
+        }
 
         return future;
     }
 
     @Override
     public void run() {
-        if(future == null)
-            throw new IllegalStateException();
+        try {
+            for (; ; ) {
+                final SimpleThreadHttpStatusTestRunner runner = runnerPool.take();
+                runner.testHost();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
+    private void testHost() {
         try {
             future.setResult(call());
         } catch (Exception e) {
@@ -43,7 +53,12 @@ public class SimpleThreadHttpStatusTestRunner implements Runnable, HostTestRunne
         return httpStatusTest.test();
     }
 
-    public void setThreadPool(SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> threadPool) {
-        this.threadPool = threadPool;
+    public void setRunnerPool(SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> runnerPool) {
+        this.runnerPool = runnerPool;
+    }
+
+    @Override
+    public int compareTo(SimpleThreadHttpStatusTestRunner o) {
+        return 0;
     }
 }
