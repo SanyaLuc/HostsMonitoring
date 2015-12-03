@@ -16,7 +16,7 @@ public class RandomHttpStatusTest implements HostTest {
 
     @Override
     public Integer test() throws Exception{
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         return 200+random.nextInt(200);
     }
 

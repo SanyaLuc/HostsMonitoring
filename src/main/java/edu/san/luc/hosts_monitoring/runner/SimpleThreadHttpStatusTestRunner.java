@@ -11,7 +11,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  */
 public class SimpleThreadHttpStatusTestRunner implements Runnable, Comparable<SimpleThreadHttpStatusTestRunner>, HostTestRunner<Integer> {
     private HostTest httpStatusTest;
-    private SimpleFuture future = new SimpleFuture();
+    private SimpleFuture future;
     private SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> runnerPool;
 
     public SimpleThreadHttpStatusTestRunner(HostTest httpStatusTest) {
@@ -20,6 +20,7 @@ public class SimpleThreadHttpStatusTestRunner implements Runnable, Comparable<Si
 
     @Override
     public Future<Integer> start() {
+        future = new SimpleFuture();
         if (runnerPool.put(this)) {
             Thread t = new Thread(this);
             t.start();
