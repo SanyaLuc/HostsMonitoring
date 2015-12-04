@@ -5,12 +5,31 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static java.lang.System.nanoTime;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 /**
  * Created by sanya on 22.11.15.
  */
-public class SimpleFuture<T> implements Future<T> {
+public class SimpleFuture<T> implements Future<T>, Comparable<SimpleFuture<T>> {
     private T result;
     private Exception exception;
+    private Long triggerTime = 0L;
+
+    public SimpleFuture() {
+    }
+
+    public SimpleFuture(int delay) {
+        this.triggerTime = triggerTime(delay);
+    }
+
+    private static long triggerTime(int delay) {
+        return nanoTime() + SECONDS.toNanos(delay);
+    }
+
+    public long getDelay() {
+        return triggerTime - nanoTime();
+    }
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
@@ -58,5 +77,10 @@ public class SimpleFuture<T> implements Future<T> {
     public synchronized void setException(Exception exception) {
         this.exception = exception;
         this.notifyAll();
+    }
+
+    @Override
+    public int compareTo(SimpleFuture<T> future) {
+        return this.triggerTime.compareTo(future.triggerTime);
     }
 }
