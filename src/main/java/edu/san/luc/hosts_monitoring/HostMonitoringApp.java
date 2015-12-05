@@ -27,8 +27,8 @@ public class HostMonitoringApp {
     public static final String DEFAULT_TIMEOUT = "1000";
     public static final String DEFAULT_PING_INTERVAL = "60";
 
-    private SimpleRunnerPool<SimpleThreadPingTestRunner> pingTestRunnerPool;
-    private SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> httpStatusTestRunnerPool;
+    private SimpleRunnerPool<HostTestResult, SimpleThreadPingTestRunner> pingTestRunnerPool;
+    private SimpleRunnerPool<Integer, SimpleThreadHttpStatusTestRunner> httpStatusTestRunnerPool;
     private ScheduledExecutorService pingTestExecutor;
 
     private ExecutorService httpStatusTestExecutor;

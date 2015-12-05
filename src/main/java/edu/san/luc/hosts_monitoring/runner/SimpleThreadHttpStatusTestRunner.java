@@ -9,10 +9,9 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 /**
  * Created by sanya on 16.09.15.
  */
-public class SimpleThreadHttpStatusTestRunner implements Runnable, Comparable<SimpleThreadHttpStatusTestRunner>, HostTestRunner<Integer> {
+public class SimpleThreadHttpStatusTestRunner implements HostTestRunner<Integer> {
     private HostTest httpStatusTest;
-    private SimpleFuture future;
-    private SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> runnerPool;
+    private SimpleRunnerPool<Integer, SimpleThreadHttpStatusTestRunner> runnerPool;
 
     public SimpleThreadHttpStatusTestRunner(HostTest httpStatusTest) {
         this.httpStatusTest = httpStatusTest;
@@ -20,33 +19,7 @@ public class SimpleThreadHttpStatusTestRunner implements Runnable, Comparable<Si
 
     @Override
     public Future<Integer> start() {
-        future = new SimpleFuture();
-        if (runnerPool.put(this)) {
-            Thread t = new Thread(this);
-            t.start();
-        }
-
-        return future;
-    }
-
-    @Override
-    public void run() {
-        try {
-            for (; ; ) {
-                final SimpleThreadHttpStatusTestRunner runner = runnerPool.take();
-                runner.testHost();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void testHost() {
-        try {
-            future.setResult(call());
-        } catch (Exception e) {
-            future.setException(e);
-        }
+        return runnerPool.submit(this);
     }
 
     @Override
@@ -54,12 +27,7 @@ public class SimpleThreadHttpStatusTestRunner implements Runnable, Comparable<Si
         return httpStatusTest.test();
     }
 
-    public void setRunnerPool(SimpleRunnerPool<SimpleThreadHttpStatusTestRunner> runnerPool) {
+    public void setRunnerPool(SimpleRunnerPool<Integer, SimpleThreadHttpStatusTestRunner> runnerPool) {
         this.runnerPool = runnerPool;
-    }
-
-    @Override
-    public int compareTo(SimpleThreadHttpStatusTestRunner o) {
-        return 0;
     }
 }

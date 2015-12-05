@@ -1,8 +1,8 @@
 package edu.san.luc.hosts_monitoring.runner;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.locks.Condition;
@@ -21,30 +21,56 @@ public class SimpleRunnerPool<R, T extends Callable<R>> {
 
     public SimpleRunnerPool(int limit) {
         this.limit = limit;
-        this.workers = new ArrayList<>(limit);
+        this.workers = new CopyOnWriteArrayList<>();
         this.queue = new PriorityBlockingQueue<>(limit);
     }
 
     public Future<R> submit(T runner) {
-        SimpleFuture<R> future = new SimpleFuture<>();
+        return schedule(0, runner);
+    }
+
+    public Future<R> schedule(int delay, T runner) {
+        SimpleFuture<R> future = delay > 0 ? new SimpleFuture<>(delay) : new SimpleFuture<>();
         queue.put(new DeferredRunner(future, runner));
 
         startWorker();
 
+        notifyWorkers();
+
         return future;
     }
 
-    private synchronized boolean startWorker(){
-        if (workers.size() < limit) {
-            QueueWorker worker = new QueueWorker();
-            workers.add(worker);
-            Thread t = new Thread(worker);
-            t.start();
+    private void notifyWorkers() {
+        for (QueueWorker worker : workers) {
+            try {
+                worker.lock.lockInterruptibly();
+                try {
+                    worker.available.signalAll();
+                } finally {
+                    worker.lock.unlock();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
-            return true;
+    private synchronized boolean startWorker(){
+        QueueWorker worker = null;
+
+        synchronized (workers){
+            if (workers.size() < limit) {
+                worker = new QueueWorker();
+                workers.add(worker);
+            }
         }
 
-        return false;
+        if(worker != null){
+            Thread t = new Thread(worker);
+            t.start();
+        }
+
+        return worker != null;
     }
 
     private class DeferredRunner implements Comparable<DeferredRunner> {
