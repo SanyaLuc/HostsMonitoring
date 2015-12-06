@@ -1,17 +1,15 @@
 package edu.san.luc.hosts_monitoring.runner;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 import static java.lang.System.nanoTime;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * Created by sanya on 22.11.15.
  */
-public class SimpleFuture<T> implements Future<T>, Comparable<SimpleFuture<T>> {
+public class SimpleFuture<T> implements ScheduledFuture<T> {
     private T result;
     private Exception exception;
     private Long triggerTime = 0L;
@@ -27,8 +25,13 @@ public class SimpleFuture<T> implements Future<T>, Comparable<SimpleFuture<T>> {
         return nanoTime() + SECONDS.toNanos(delay);
     }
 
-    public long getDelay() {
-        return triggerTime - nanoTime();
+    @Override
+    public long getDelay(TimeUnit unit) {
+        long delay = triggerTime - nanoTime();
+        if (unit == NANOSECONDS)
+            return delay;
+        else
+            return unit.convert(delay, NANOSECONDS);
     }
 
     @Override
@@ -48,8 +51,8 @@ public class SimpleFuture<T> implements Future<T>, Comparable<SimpleFuture<T>> {
 
     @Override
     public synchronized T get() throws InterruptedException, ExecutionException {
-        for(;;){
-            if(isDone()){
+        for (; ; ) {
+            if (isDone()) {
                 if (exception != null) {
                     if (exception instanceof InterruptedException)
                         throw (InterruptedException) exception;
@@ -80,7 +83,7 @@ public class SimpleFuture<T> implements Future<T>, Comparable<SimpleFuture<T>> {
     }
 
     @Override
-    public int compareTo(SimpleFuture<T> future) {
-        return this.triggerTime.compareTo(future.triggerTime);
+    public int compareTo(Delayed d) {
+        return new Long(this.getDelay(NANOSECONDS)).compareTo(d.getDelay(NANOSECONDS));
     }
 }

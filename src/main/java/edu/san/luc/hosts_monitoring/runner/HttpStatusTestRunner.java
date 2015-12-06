@@ -10,7 +10,7 @@ import java.util.concurrent.Future;
  */
 public class HttpStatusTestRunner implements HostTestRunner<Integer> {
     private HostTest httpStatusTest;
-    private ExecutorService httpStatusTestExecutor;
+    private RunnerPool runnerPool;
 
     public HttpStatusTestRunner(HostTest httpStatusTest) {
         this.httpStatusTest = httpStatusTest;
@@ -18,7 +18,7 @@ public class HttpStatusTestRunner implements HostTestRunner<Integer> {
 
     @Override
     public Future<Integer> start() {
-        return httpStatusTestExecutor.submit(this);
+        return runnerPool.submit(this);
     }
 
     @Override
@@ -26,7 +26,7 @@ public class HttpStatusTestRunner implements HostTestRunner<Integer> {
         return httpStatusTest.test();
     }
 
-    public void setHttpStatusTestExecutor(ExecutorService httpStatusTestExecutor) {
-        this.httpStatusTestExecutor = httpStatusTestExecutor;
+    public void setRunnerPool(RunnerPool runnerPool) {
+        this.runnerPool = runnerPool;
     }
 }

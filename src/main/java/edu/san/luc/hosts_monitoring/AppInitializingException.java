@@ -3,7 +3,7 @@ package edu.san.luc.hosts_monitoring;
 /**
  * Created by sanya on 20.09.15.
  */
-public class AppInitializingException extends RuntimeException{
+public class AppInitializingException extends RuntimeException {
 
     public AppInitializingException(String message) {
         super(message);

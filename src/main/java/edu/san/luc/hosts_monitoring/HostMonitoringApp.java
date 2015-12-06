@@ -1,7 +1,10 @@
 package edu.san.luc.hosts_monitoring;
 
 import edu.san.luc.hosts_monitoring.runner.*;
-import edu.san.luc.hosts_monitoring.test.*;
+import edu.san.luc.hosts_monitoring.test.HostTest;
+import edu.san.luc.hosts_monitoring.test.HostTestResult;
+import edu.san.luc.hosts_monitoring.test.RandomHttpStatusTest;
+import edu.san.luc.hosts_monitoring.test.RandomPingTest;
 import edu.san.luc.hosts_monitoring.web.HostMonitoringWebServer;
 
 import java.io.InputStream;
@@ -27,11 +30,11 @@ public class HostMonitoringApp {
     public static final String DEFAULT_TIMEOUT = "1000";
     public static final String DEFAULT_PING_INTERVAL = "60";
 
-    private SimpleRunnerPool<HostTestResult, SimpleThreadPingTestRunner> pingTestRunnerPool;
-    private SimpleRunnerPool<Integer, SimpleThreadHttpStatusTestRunner> httpStatusTestRunnerPool;
-    private ScheduledExecutorService pingTestExecutor;
+    private SimpleRunnerPool pingTestRunnerPool;
+    private SimpleRunnerPool httpStatusTestRunnerPool;
+    private StandardRunnerPool pingTestExecutor;
+    private StandardRunnerPool httpStatusTestExecutor;
 
-    private ExecutorService httpStatusTestExecutor;
     private List<HostTestRunner> pingTests;
 
     private List<URL> urls;
@@ -63,18 +66,18 @@ public class HostMonitoringApp {
             pingTestPoolSize = valueOf(appProperties.getProperty("ping.test.executor.pool.size", DEFAULT_EXECUTOR_POOL_SIZE));
             responseTestPoolSize = valueOf(appProperties.getProperty("http.status.test.executor.pool.size", DEFAULT_EXECUTOR_POOL_SIZE));
 
-            pingTestExecutor = newScheduledThreadPool(pingTestPoolSize);
-            httpStatusTestExecutor = newFixedThreadPool(responseTestPoolSize);
+            pingTestExecutor = new StandardRunnerPool(pingTestPoolSize);
+            httpStatusTestExecutor = new StandardRunnerPool(responseTestPoolSize);
 
-            pingTestRunnerPool = new SimpleRunnerPool<>(pingTestPoolSize);
-            httpStatusTestRunnerPool = new SimpleRunnerPool<>(responseTestPoolSize);
+            pingTestRunnerPool = new SimpleRunnerPool(pingTestPoolSize);
+            httpStatusTestRunnerPool = new SimpleRunnerPool(responseTestPoolSize);
 
             urls = loadUrls();
 
             sharedTestResults = createInitialTestResults(urls);
 
-//            pingTests = createTests(urls, PingTestRunner.class);
-            pingTests = createTests(urls, SimpleThreadPingTestRunner.class);
+            pingTests = createTests(urls, PingTestRunner.class);
+//            pingTests = createTests(urls, SimpleThreadPingTestRunner.class);
         } catch (Exception e) {
             throw new AppInitializingException("Couldn't initialize the app", e);
         }
@@ -92,31 +95,33 @@ public class HostMonitoringApp {
         return urls;
     }
 
-    private List<HostTestRunner> createTests(List<URL> urls, Class<? extends AbstractPingTestRunner> type) {
+    private List<HostTestRunner> createTests(List<URL> urls, Class<? extends PingTestRunner> type) {
         Map<String, HostTestRunner> groupedTests = new LinkedHashMap<String, HostTestRunner>(urls.size());
 
         Map<Boolean, Integer> intervalPerPingStatus = mapIntervalPerPingStatus();
 
         for (URL url : urls) {
             HostTest pingTest = new RandomPingTest(url);
-            AbstractPingTestRunner pingTestRunner = type == PingTestRunner.class ?
-                    createPingTestRunner(pingTest) :
-                    createSimpleThreadPingTestRunner(pingTest);
-
+            PingTestRunner pingTestRunner = new PingTestRunner(pingTest);
             pingTestRunner.setIntervalPerPingStatus(intervalPerPingStatus);
             pingTestRunner.setTestResults(sharedTestResults);
 
             RandomHttpStatusTest httpStatusTest = new RandomHttpStatusTest(url);
-            HostTestRunner httpStatusTestRunner = type == PingTestRunner.class ?
-                    createHttpStatusTestRunner(httpStatusTest):
-                    createHSimpleThreadHttpStatusTestRunner(httpStatusTest);
-
+            HttpStatusTestRunner httpStatusTestRunner = new HttpStatusTestRunner(httpStatusTest);
             pingTestRunner.setHttpStatusTestRunner(httpStatusTestRunner);
+
+            if(type == PingTestRunner.class){
+                pingTestRunner.setRunnerPool(pingTestExecutor);
+                httpStatusTestRunner.setRunnerPool(httpStatusTestExecutor);
+            } else {
+                pingTestRunner.setRunnerPool(pingTestRunnerPool);
+                httpStatusTestRunner.setRunnerPool(httpStatusTestRunnerPool);
+            }
 
             String host = url.getHost();
 
             String parentHost = host.substring(host.indexOf(".") + 1);
-            AbstractPingTestRunner parentTest = (AbstractPingTestRunner) groupedTests.get(parentHost);
+            PingTestRunner parentTest = (PingTestRunner) groupedTests.get(parentHost);
 
             if (parentTest != null)
                 parentTest.addSubTest(pingTestRunner);
@@ -125,34 +130,6 @@ public class HostMonitoringApp {
         }
 
         return new ArrayList<>(groupedTests.values());
-    }
-
-    private SimpleThreadHttpStatusTestRunner createHSimpleThreadHttpStatusTestRunner(HostTest test) {
-        SimpleThreadHttpStatusTestRunner httpStatusTestRunner = new SimpleThreadHttpStatusTestRunner(test);
-        httpStatusTestRunner.setRunnerPool(httpStatusTestRunnerPool);
-
-        return httpStatusTestRunner;
-    }
-
-    private HttpStatusTestRunner createHttpStatusTestRunner(HostTest test) {
-        HttpStatusTestRunner httpStatusTestRunner = new HttpStatusTestRunner(test);
-        httpStatusTestRunner.setHttpStatusTestExecutor(httpStatusTestExecutor);
-
-        return httpStatusTestRunner;
-    }
-
-    private PingTestRunner createPingTestRunner(HostTest test) {
-        PingTestRunner pingTestRunner = new PingTestRunner(test);
-        pingTestRunner.setPingTestExecutorService(pingTestExecutor);
-
-        return pingTestRunner;
-    }
-
-    private SimpleThreadPingTestRunner createSimpleThreadPingTestRunner(HostTest test) {
-        SimpleThreadPingTestRunner pingTestRunner = new SimpleThreadPingTestRunner(test);
-        pingTestRunner.setRunnerPool(pingTestRunnerPool);
-
-        return pingTestRunner;
     }
 
     private void runTests() {

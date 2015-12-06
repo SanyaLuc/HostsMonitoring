@@ -1,19 +1,17 @@
 package edu.san.luc.hosts_monitoring.runner;
 
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Future;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * Created by sanya on 28.11.15.
  */
-public class SimpleRunnerPool<R, T extends Callable<R>> {
+public class SimpleRunnerPool implements RunnerPool {
 
     private Integer limit;
     private List<QueueWorker> workers;
@@ -25,12 +23,16 @@ public class SimpleRunnerPool<R, T extends Callable<R>> {
         this.queue = new PriorityBlockingQueue<>(limit);
     }
 
-    public Future<R> submit(T runner) {
-        return schedule(0, runner);
+    @Override
+    public <T> Future<T> submit(Callable<T> runner) {
+        return schedule(runner, 0, SECONDS);
     }
 
-    public Future<R> schedule(int delay, T runner) {
-        SimpleFuture<R> future = delay > 0 ? new SimpleFuture<>(delay) : new SimpleFuture<>();
+    @Override
+    public <T> ScheduledFuture<T> schedule(Callable<T> runner, long delay, TimeUnit unit) {
+        SimpleFuture<T> future = delay > 0
+                ? new SimpleFuture<>((int)unit.toSeconds(delay))
+                : new SimpleFuture<>();
         queue.put(new DeferredRunner(future, runner));
 
         startWorker();
@@ -55,17 +57,17 @@ public class SimpleRunnerPool<R, T extends Callable<R>> {
         }
     }
 
-    private synchronized boolean startWorker(){
+    private synchronized boolean startWorker() {
         QueueWorker worker = null;
 
-        synchronized (workers){
+        synchronized (workers) {
             if (workers.size() < limit) {
                 worker = new QueueWorker();
                 workers.add(worker);
             }
         }
 
-        if(worker != null){
+        if (worker != null) {
             Thread t = new Thread(worker);
             t.start();
         }
@@ -74,10 +76,10 @@ public class SimpleRunnerPool<R, T extends Callable<R>> {
     }
 
     private class DeferredRunner implements Comparable<DeferredRunner> {
-        private SimpleFuture<R> future;
-        private T runner;
+        private SimpleFuture future;
+        private Callable runner;
 
-        private DeferredRunner(SimpleFuture<R> future, T runner) {
+        private DeferredRunner(SimpleFuture future, Callable runner) {
             this.future = future;
             this.runner = runner;
         }
@@ -97,14 +99,14 @@ public class SimpleRunnerPool<R, T extends Callable<R>> {
             try {
                 for (; ; ) {
                     final DeferredRunner deferredRunner = queue.take();
-                    final T runner = deferredRunner.runner;
-                    final SimpleFuture<R> future = deferredRunner.future;
+                    final Callable runner = deferredRunner.runner;
+                    final SimpleFuture future = deferredRunner.future;
 
-                    final long delay = future.getDelay();
+                    final long delay = future.getDelay(NANOSECONDS);
 //                System.out.println("#### "+runner.pingTest.getURL()+" @@@@@ " + Thread.currentThread());
                     if (delay < 0) {
                         try {
-                            R result = runner.call();
+                            Object result = runner.call();
                             future.setResult(result);
                         } catch (Exception e) {
                             future.setException(e);

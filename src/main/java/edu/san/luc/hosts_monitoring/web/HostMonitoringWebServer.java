@@ -44,13 +44,13 @@ public class HostMonitoringWebServer {
         public void handle(HttpExchange t) throws IOException {
             String response = "<html>" +
                     "<header>" +
-                        "<title>URL Status Report</title>" +
-                        "<meta http-equiv=\"refresh\" content=\"2\"/>"+
+                    "<title>URL Status Report</title>" +
+                    "<meta http-equiv=\"refresh\" content=\"2\"/>" +
                     "</header>" +
                     "<body>" +
                     "<table border='1'>" +
-                        STATUS_TABLE_HEADER +
-                        renderTestStatusTable() +
+                    STATUS_TABLE_HEADER +
+                    renderTestStatusTable() +
                     "</table>" +
                     "</body>" +
                     "</html>";
@@ -60,7 +60,7 @@ public class HostMonitoringWebServer {
             os.close();
         }
 
-        private String renderTestStatusTable(){
+        private String renderTestStatusTable() {
             StringBuilder tableBody = new StringBuilder();
 
             for (URL url : urls) {
@@ -74,7 +74,7 @@ public class HostMonitoringWebServer {
             return tableBody.toString();
         }
 
-        private String renderURLWithDomainLevel(HostTestResult urlTestResult){
+        private String renderURLWithDomainLevel(HostTestResult urlTestResult) {
             String levelPadding = "";
 
             int levelNumber = urlTestResult.getUrl().getHost().split("\\.").length - 1;
@@ -85,18 +85,18 @@ public class HostMonitoringWebServer {
             return levelPadding + urlTestResult.getUrl();
         }
 
-        private String renderPingStatus(HostTestResult urlTestResult){
-            if(urlTestResult.getPingStatus() == null)
+        private String renderPingStatus(HostTestResult urlTestResult) {
+            if (urlTestResult.getPingStatus() == null)
                 return "ONGOING";
 
             return urlTestResult.getPingStatus() ? "OK" : "FAILED";
         }
 
-        private String renderHttpStatus(HostTestResult urlTestResult){
-            if(urlTestResult.getPingStatus() == null || !urlTestResult.getPingStatus())
+        private String renderHttpStatus(HostTestResult urlTestResult) {
+            if (urlTestResult.getPingStatus() == null || !urlTestResult.getPingStatus())
                 return "";
 
-            if(urlTestResult.getHttpStatus() == null)
+            if (urlTestResult.getHttpStatus() == null)
                 return "ONGOING";
 
             return urlTestResult.getHttpStatus().toString();

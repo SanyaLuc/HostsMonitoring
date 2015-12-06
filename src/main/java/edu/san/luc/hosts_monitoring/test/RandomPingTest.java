@@ -16,7 +16,7 @@ public class RandomPingTest implements HostTest {
 
     @Override
     public Integer test() throws Exception {
-        System.out.println("ping "+url);
+        System.out.println("ping " + url);
         Thread.sleep(2000);
         return random.nextInt(2);
     }
