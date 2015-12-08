@@ -2,7 +2,6 @@ package edu.san.luc.hosts_monitoring.runner;
 
 import edu.san.luc.hosts_monitoring.test.HostTest;
 
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**

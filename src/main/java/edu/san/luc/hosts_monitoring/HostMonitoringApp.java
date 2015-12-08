@@ -12,14 +12,10 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
 
 import static edu.san.luc.hosts_monitoring.test.HostTestResult.PING_FAILED;
 import static edu.san.luc.hosts_monitoring.test.HostTestResult.PING_OK;
 import static java.lang.Integer.valueOf;
-import static java.util.concurrent.Executors.newFixedThreadPool;
-import static java.util.concurrent.Executors.newScheduledThreadPool;
 
 /**
  * Created by sanya on 14.09.15.
@@ -110,7 +106,7 @@ public class HostMonitoringApp {
             HttpStatusTestRunner httpStatusTestRunner = new HttpStatusTestRunner(httpStatusTest);
             pingTestRunner.setHttpStatusTestRunner(httpStatusTestRunner);
 
-            if(type == PingTestRunner.class){
+            if (type == PingTestRunner.class) {
                 pingTestRunner.setRunnerPool(pingTestExecutor);
                 httpStatusTestRunner.setRunnerPool(httpStatusTestExecutor);
             } else {

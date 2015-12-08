@@ -31,7 +31,7 @@ public class SimpleRunnerPool implements RunnerPool {
     @Override
     public <T> ScheduledFuture<T> schedule(Callable<T> runner, long delay, TimeUnit unit) {
         SimpleFuture<T> future = delay > 0
-                ? new SimpleFuture<>((int)unit.toSeconds(delay))
+                ? new SimpleFuture<>((int) unit.toSeconds(delay))
                 : new SimpleFuture<>();
         queue.put(new DeferredRunner(future, runner));
 
