@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static edu.san.luc.hosts_monitoring.test.HostTestResult.PING_FAILED;
 import static edu.san.luc.hosts_monitoring.test.HostTestResult.PING_OK;
+import static java.lang.Integer.toBinaryString;
 import static java.lang.Integer.valueOf;
 
 /**
@@ -129,9 +130,7 @@ public class HostMonitoringApp {
     }
 
     private void runTests() {
-        for (HostTestRunner pingTest : pingTests) {
-            pingTest.start();
-        }
+        pingTests.stream().forEach(HostTestRunner::start);
     }
 
     private Map<Boolean, Integer> mapIntervalPerPingStatus() {
